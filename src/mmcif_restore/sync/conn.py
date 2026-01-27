@@ -6,9 +6,14 @@ import gemmi
 
 logger = logging.getLogger(__name__)
 
+# CIF special values
+CIF_INAPPLICABLE = "."
+CIF_UNKNOWN = "?"
+
 # Key for identifying an atom in _struct_conn
 # (auth_asym_id, auth_seq_id, pdbx_PDB_ins_code, auth_comp_id, label_atom_id)
 AtomKey = tuple[str, str, str, str, str]
+"""Atom identifier tuple: (auth_asym_id, auth_seq_id, ins_code, comp_id, atom_id)."""
 
 
 def _build_atom_set(structure: gemmi.Structure) -> set[AtomKey]:
@@ -119,7 +124,7 @@ def sync_conn_categories(block: gemmi.cif.Block, structure: gemmi.Structure) -> 
         ptnr1_ins = ""
         if ptnr1_ins_idx is not None:
             ptnr1_ins = all_values[row_start + ptnr1_ins_idx]
-            if ptnr1_ins in (".", "?"):
+            if ptnr1_ins in (CIF_INAPPLICABLE, CIF_UNKNOWN):
                 ptnr1_ins = ""
 
         ptnr1_key: AtomKey = (
@@ -135,7 +140,7 @@ def sync_conn_categories(block: gemmi.cif.Block, structure: gemmi.Structure) -> 
         ptnr2_ins = ""
         if ptnr2_ins_idx is not None:
             ptnr2_ins = all_values[row_start + ptnr2_ins_idx]
-            if ptnr2_ins in (".", "?"):
+            if ptnr2_ins in (CIF_INAPPLICABLE, CIF_UNKNOWN):
                 ptnr2_ins = ""
 
         ptnr2_key: AtomKey = (

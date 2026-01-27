@@ -45,7 +45,7 @@ covale1 covale A 30 SER OG A 35 SER CB ? ?
 def structure_with_all_atoms() -> gemmi.Structure:
     """Create a structure with all atoms referenced in _struct_conn."""
     st = gemmi.Structure()
-    model = gemmi.Model("1")
+    model = gemmi.Model(1)
 
     # Chain A with CYS 10, CYS 20, HIS 50, ALA 5, SER 30, SER 35
     chain_a = gemmi.Chain("A")
@@ -254,7 +254,7 @@ conn2 disulf A 10 CYS SG A 10 CYS SG A ?
 
         # Create structure with residue 10 (no insertion) and 10A
         st = gemmi.Structure()
-        model = gemmi.Model("1")
+        model = gemmi.Model(1)
         chain = gemmi.Chain("A")
 
         # Residue 10 without insertion code
@@ -267,7 +267,7 @@ conn2 disulf A 10 CYS SG A 10 CYS SG A ?
         # Residue 10A with insertion code
         res2 = gemmi.Residue()
         res2.name = "CYS"
-        res2.seqid = gemmi.SeqId("10", "A")
+        res2.seqid = gemmi.SeqId(10, "A")
         res2.add_atom(_make_atom("SG"))
         chain.add_residue(res2)
 
@@ -308,7 +308,7 @@ conn1 disulf A 10 CYS SG A 20 CYS SG A ?
 
         # Create structure with only residue 10 (no insertion) and 20
         st = gemmi.Structure()
-        model = gemmi.Model("1")
+        model = gemmi.Model(1)
         chain = gemmi.Chain("A")
 
         res1 = gemmi.Residue()
@@ -332,3 +332,153 @@ conn1 disulf A 10 CYS SG A 20 CYS SG A ?
 
         # conn1 should be removed (10A doesn't exist, only 10)
         assert "conn1" not in conn_ids
+
+
+class TestSyncConnEdgeCases:
+    """Tests for edge cases in sync_conn_categories."""
+
+    def test_handles_empty_structure(self) -> None:
+        """Test that sync handles empty structure gracefully."""
+        cif_content = """\
+data_TEST
+#
+loop_
+_struct_conn.id
+_struct_conn.conn_type_id
+_struct_conn.ptnr1_auth_asym_id
+_struct_conn.ptnr1_auth_seq_id
+_struct_conn.ptnr1_auth_comp_id
+_struct_conn.ptnr1_label_atom_id
+_struct_conn.ptnr2_auth_asym_id
+_struct_conn.ptnr2_auth_seq_id
+_struct_conn.ptnr2_auth_comp_id
+_struct_conn.ptnr2_label_atom_id
+conn1 disulf A 10 CYS SG A 20 CYS SG
+#
+"""
+        doc = gemmi.cif.read_string(cif_content)
+        block = doc[0]
+
+        empty_structure = gemmi.Structure()
+        sync_conn_categories(block, empty_structure)
+
+        # Should return early without modifying block
+        conn_ids = [row[0] for row in block.find("_struct_conn.", ["id"])]
+        assert "conn1" in conn_ids  # Unchanged because early return
+
+    def test_handles_no_struct_conn_loop(self) -> None:
+        """Test that sync handles CIF without _struct_conn loop."""
+        cif_content = """\
+data_TEST
+#
+loop_
+_entity.id
+_entity.type
+1 polymer
+#
+"""
+        doc = gemmi.cif.read_string(cif_content)
+        block = doc[0]
+
+        st = gemmi.Structure()
+        model = gemmi.Model(1)
+        chain = gemmi.Chain("A")
+        res = gemmi.Residue()
+        res.name = "ALA"
+        res.seqid = gemmi.SeqId("1")
+        res.add_atom(_make_atom("CA"))
+        chain.add_residue(res)
+        model.add_chain(chain)
+        st.add_model(model)
+
+        # Should not raise, just return early
+        sync_conn_categories(block, st)
+
+        # Verify the block is unchanged
+        assert block.find(["_entity.id"]) is not None
+
+    def test_handles_missing_required_columns(self) -> None:
+        """Test that sync handles _struct_conn with missing required columns."""
+        # Missing ptnr1_auth_comp_id column
+        cif_content = """\
+data_TEST
+#
+loop_
+_struct_conn.id
+_struct_conn.conn_type_id
+_struct_conn.ptnr1_auth_asym_id
+_struct_conn.ptnr1_auth_seq_id
+_struct_conn.ptnr1_label_atom_id
+_struct_conn.ptnr2_auth_asym_id
+_struct_conn.ptnr2_auth_seq_id
+_struct_conn.ptnr2_label_atom_id
+conn1 disulf A 10 SG A 20 SG
+#
+"""
+        doc = gemmi.cif.read_string(cif_content)
+        block = doc[0]
+
+        st = gemmi.Structure()
+        model = gemmi.Model(1)
+        chain = gemmi.Chain("A")
+        res = gemmi.Residue()
+        res.name = "CYS"
+        res.seqid = gemmi.SeqId("10")
+        res.add_atom(_make_atom("SG"))
+        chain.add_residue(res)
+        model.add_chain(chain)
+        st.add_model(model)
+
+        # Should not raise, just return early
+        sync_conn_categories(block, st)
+
+        # Connection should still exist (unchanged due to early return)
+        conn_ids = [row[0] for row in block.find("_struct_conn.", ["id"])]
+        assert "conn1" in conn_ids
+
+    def test_handles_struct_conn_without_insertion_code_columns(self) -> None:
+        """Test sync works when insertion code columns are absent."""
+        cif_content = """\
+data_TEST
+#
+loop_
+_struct_conn.id
+_struct_conn.conn_type_id
+_struct_conn.ptnr1_auth_asym_id
+_struct_conn.ptnr1_auth_seq_id
+_struct_conn.ptnr1_auth_comp_id
+_struct_conn.ptnr1_label_atom_id
+_struct_conn.ptnr2_auth_asym_id
+_struct_conn.ptnr2_auth_seq_id
+_struct_conn.ptnr2_auth_comp_id
+_struct_conn.ptnr2_label_atom_id
+conn1 disulf A 10 CYS SG A 20 CYS SG
+#
+"""
+        doc = gemmi.cif.read_string(cif_content)
+        block = doc[0]
+
+        st = gemmi.Structure()
+        model = gemmi.Model(1)
+        chain = gemmi.Chain("A")
+
+        res1 = gemmi.Residue()
+        res1.name = "CYS"
+        res1.seqid = gemmi.SeqId("10")
+        res1.add_atom(_make_atom("SG"))
+        chain.add_residue(res1)
+
+        res2 = gemmi.Residue()
+        res2.name = "CYS"
+        res2.seqid = gemmi.SeqId("20")
+        res2.add_atom(_make_atom("SG"))
+        chain.add_residue(res2)
+
+        model.add_chain(chain)
+        st.add_model(model)
+
+        sync_conn_categories(block, st)
+
+        # Connection should remain (both atoms exist)
+        conn_ids = [row[0] for row in block.find("_struct_conn.", ["id"])]
+        assert "conn1" in conn_ids
