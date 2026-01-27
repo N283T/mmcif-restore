@@ -14,9 +14,8 @@ from mmcif_restore.sync.scheme import sync_scheme_categories
 
 logger = logging.getLogger(__name__)
 
-# Registry of category sync handlers
+# Registry of category sync handlers (takes StructureInfo)
 CATEGORY_SYNC_HANDLERS: dict[str, Callable[[gemmi.cif.Block, StructureInfo], None]] = {
-    "_struct_conn.": sync_conn_categories,
     "_entity.": sync_entity_categories,
     "_entity_poly.": sync_entity_categories,
     "_pdbx_entity_nonpoly.": sync_entity_categories,
@@ -25,6 +24,9 @@ CATEGORY_SYNC_HANDLERS: dict[str, Callable[[gemmi.cif.Block, StructureInfo], Non
     "_pdbx_poly_seq_scheme.": sync_scheme_categories,
     "_pdbx_branch_scheme.": sync_scheme_categories,
 }
+
+# Categories that need structure instead of info (atom-level sync)
+STRUCTURE_SYNC_CATEGORIES: set[str] = {"_struct_conn."}
 
 
 class RestoreError(Exception):
@@ -103,7 +105,7 @@ def restore_categories(
 
     # Restore each category from reference with sync
     for category_prefix in categories:
-        _restore_and_sync_category(ref_block, block, category_prefix, info)
+        _restore_and_sync_category(ref_block, block, category_prefix, info, structure)
 
     return doc
 
@@ -113,6 +115,7 @@ def _restore_and_sync_category(
     target_block: gemmi.cif.Block,
     category_prefix: str,
     info: StructureInfo,
+    structure: gemmi.Structure,
 ) -> None:
     """Restore a category from source to target, synced to structure info.
 
@@ -121,6 +124,7 @@ def _restore_and_sync_category(
         target_block: Edited CIF block to copy to
         category_prefix: Category prefix (e.g., "_struct_conn.")
         info: Current structure information for filtering
+        structure: Current structure for atom-level filtering
     """
     # Find the loop in source
     source_loop = None
@@ -149,9 +153,14 @@ def _restore_and_sync_category(
     ]
     new_loop.set_all_values(columns)
 
-    # Apply sync using registry
-    handler = CATEGORY_SYNC_HANDLERS.get(category_prefix)
-    if handler:
-        handler(target_block, info)
+    # Apply sync based on category type
+    if category_prefix in STRUCTURE_SYNC_CATEGORIES:
+        # Atom-level sync (needs structure)
+        sync_conn_categories(target_block, structure)
     else:
-        logger.debug("No sync handler for category %s", category_prefix)
+        # Chain/entity-level sync (uses info)
+        handler = CATEGORY_SYNC_HANDLERS.get(category_prefix)
+        if handler:
+            handler(target_block, info)
+        else:
+            logger.debug("No sync handler for category %s", category_prefix)
