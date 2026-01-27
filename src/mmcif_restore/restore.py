@@ -1,5 +1,7 @@
 """Main restore function for mmcif-restore."""
 
+import logging
+from collections.abc import Callable
 from pathlib import Path
 
 import gemmi
@@ -9,6 +11,24 @@ from mmcif_restore.sync.chain import sync_chain_categories
 from mmcif_restore.sync.conn import sync_conn_categories
 from mmcif_restore.sync.entity import sync_entity_categories
 from mmcif_restore.sync.scheme import sync_scheme_categories
+
+logger = logging.getLogger(__name__)
+
+# Registry of category sync handlers
+CATEGORY_SYNC_HANDLERS: dict[str, Callable[[gemmi.cif.Block, StructureInfo], None]] = {
+    "_struct_conn.": sync_conn_categories,
+    "_entity.": sync_entity_categories,
+    "_entity_poly.": sync_entity_categories,
+    "_pdbx_entity_nonpoly.": sync_entity_categories,
+    "_struct_asym.": sync_chain_categories,
+    "_pdbx_nonpoly_scheme.": sync_scheme_categories,
+    "_pdbx_poly_seq_scheme.": sync_scheme_categories,
+    "_pdbx_branch_scheme.": sync_scheme_categories,
+}
+
+
+class RestoreError(Exception):
+    """Error during CIF restoration."""
 
 
 def restore_categories(
@@ -31,6 +51,9 @@ def restore_categories(
     Returns:
         A new CIF Document with the restored and synchronized categories
 
+    Raises:
+        RestoreError: If files cannot be read or are invalid
+
     Example:
         # After editing a structure in ChimeraX and saving as minimal CIF:
         doc = restore_categories(
@@ -44,15 +67,35 @@ def restore_categories(
     reference_path = Path(reference_path)
 
     # Load reference CIF (needed for entity mapping)
-    ref_doc = gemmi.cif.read(str(reference_path))
+    try:
+        ref_doc = gemmi.cif.read(str(reference_path))
+    except Exception as e:
+        raise RestoreError(
+            f"Failed to read reference CIF '{reference_path}': {e}"
+        ) from e
+
+    if len(ref_doc) == 0:
+        raise RestoreError(f"Reference CIF '{reference_path}' contains no data blocks")
+
     ref_block = ref_doc[0]
 
     # Read structure from edited CIF and extract info using reference
-    structure = gemmi.read_structure(str(edited_path))
+    try:
+        structure = gemmi.read_structure(str(edited_path))
+    except Exception as e:
+        raise RestoreError(f"Failed to read edited CIF '{edited_path}': {e}") from e
+
     info = StructureInfo.from_structure_with_reference(structure, ref_block)
 
     # Load edited CIF as base document
-    doc = gemmi.cif.read(str(edited_path))
+    try:
+        doc = gemmi.cif.read(str(edited_path))
+    except Exception as e:
+        raise RestoreError(f"Failed to read edited CIF '{edited_path}': {e}") from e
+
+    if len(doc) == 0:
+        raise RestoreError(f"Edited CIF '{edited_path}' contains no data blocks")
+
     block = doc[0]
 
     # Normalize category prefixes (ensure they end with ".")
@@ -89,6 +132,7 @@ def _restore_and_sync_category(
                 break
 
     if source_loop is None:
+        logger.debug("Category %s not found in reference CIF", category_prefix)
         return
 
     # Copy to target
@@ -105,16 +149,9 @@ def _restore_and_sync_category(
     ]
     new_loop.set_all_values(columns)
 
-    # Apply sync based on category type
-    if category_prefix == "_struct_conn.":
-        sync_conn_categories(target_block, info)
-    elif category_prefix == "_entity.":
-        sync_entity_categories(target_block, info)
-    elif category_prefix == "_struct_asym.":
-        sync_chain_categories(target_block, info)
-    elif category_prefix in (
-        "_pdbx_nonpoly_scheme.",
-        "_pdbx_poly_seq_scheme.",
-        "_pdbx_branch_scheme.",
-    ):
-        sync_scheme_categories(target_block, info)
+    # Apply sync using registry
+    handler = CATEGORY_SYNC_HANDLERS.get(category_prefix)
+    if handler:
+        handler(target_block, info)
+    else:
+        logger.debug("No sync handler for category %s", category_prefix)

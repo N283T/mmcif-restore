@@ -10,6 +10,13 @@ from mmcif_restore.structure_info import StructureInfo
 class TestStructureInfoFromStructure:
     """Tests for from_structure class method."""
 
+    def test_handles_empty_structure(self) -> None:
+        """Test behavior with empty structure."""
+        structure = gemmi.Structure()
+        info = StructureInfo.from_structure(structure)
+        assert info.entity_ids == frozenset()
+        assert info.chain_ids == frozenset()
+
     def test_extracts_entity_ids(self, sample_structure: gemmi.Structure) -> None:
         """Test that entity IDs are extracted from structure."""
         info = StructureInfo.from_structure(sample_structure)

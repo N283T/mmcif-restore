@@ -5,7 +5,7 @@ from typing import Annotated
 
 import typer
 
-from mmcif_restore import restore_categories
+from mmcif_restore import RestoreError, restore_categories
 
 app = typer.Typer(
     name="mmcif-restore",
@@ -40,6 +40,7 @@ def main(
             "-o",
             "--output",
             help="Output file path",
+            writable=True,
         ),
     ],
     categories: Annotated[
@@ -73,16 +74,27 @@ def main(
         typer.echo("Error: At least one category must be specified", err=True)
         raise typer.Exit(1)
 
+    # Validate output path
+    if not output.parent.exists():
+        typer.echo(
+            f"Error: Output directory '{output.parent}' does not exist", err=True
+        )
+        raise typer.Exit(1)
+
     typer.echo(f"Edited CIF: {edited_file}")
     typer.echo(f"Reference CIF: {reference_file}")
     typer.echo(f"Categories to restore: {', '.join(cats)}")
 
     # Restore
-    doc = restore_categories(
-        edited_file,
-        reference_file,
-        categories=cats,
-    )
+    try:
+        doc = restore_categories(
+            edited_file,
+            reference_file,
+            categories=cats,
+        )
+    except RestoreError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1) from e
 
     # Write output
     doc.write_file(str(output))

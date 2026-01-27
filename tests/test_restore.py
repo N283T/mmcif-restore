@@ -5,7 +5,7 @@ from pathlib import Path
 import gemmi
 import pytest
 
-from mmcif_restore import restore_categories
+from mmcif_restore import RestoreError, restore_categories
 
 
 class TestRestoreCategories:
@@ -123,3 +123,49 @@ class TestRestoreCategories:
         block = doc[0]
         entity_count = len(list(block.find("_entity.", ["id"])))
         assert entity_count == 2
+
+
+class TestRestoreErrorHandling:
+    """Tests for error handling in restore_categories."""
+
+    def test_raises_error_for_nonexistent_edited_file(
+        self, sample_cif_file: Path, tmp_path: Path
+    ) -> None:
+        """Test error when edited file doesn't exist."""
+        nonexistent = tmp_path / "nonexistent.cif"
+
+        with pytest.raises(RestoreError, match="Failed to read edited CIF"):
+            restore_categories(
+                nonexistent,
+                sample_cif_file,
+                categories=["_entity."],
+            )
+
+    def test_raises_error_for_nonexistent_reference_file(
+        self, sample_cif_file: Path, tmp_path: Path
+    ) -> None:
+        """Test error when reference file doesn't exist."""
+        nonexistent = tmp_path / "nonexistent.cif"
+
+        with pytest.raises(RestoreError, match="Failed to read reference CIF"):
+            restore_categories(
+                sample_cif_file,
+                nonexistent,
+                categories=["_entity."],
+            )
+
+    def test_raises_error_for_empty_reference_document(self, tmp_path: Path) -> None:
+        """Test error when reference CIF has no data blocks."""
+        # Create empty CIF
+        empty_cif = tmp_path / "empty.cif"
+        empty_cif.write_text("# empty\n")
+
+        edited_cif = tmp_path / "edited.cif"
+        edited_cif.write_text("data_TEST\n#\n")
+
+        with pytest.raises(RestoreError, match="contains no data blocks"):
+            restore_categories(
+                edited_cif,
+                empty_cif,
+                categories=["_entity."],
+            )
