@@ -169,3 +169,19 @@ class TestRestoreErrorHandling:
                 empty_cif,
                 categories=["_entity."],
             )
+
+    def test_raises_error_for_empty_edited_document(
+        self, sample_cif_file: Path, tmp_path: Path
+    ) -> None:
+        """Test error when edited CIF has no data blocks."""
+        empty_edited = tmp_path / "empty_edited.cif"
+        empty_edited.write_text("# empty\n")
+
+        # Empty file fails at gemmi.read_structure() before reaching the
+        # empty block check, so we match the structure read error instead
+        with pytest.raises(RestoreError, match="Failed to read edited CIF"):
+            restore_categories(
+                empty_edited,
+                sample_cif_file,
+                categories=["_entity."],
+            )
