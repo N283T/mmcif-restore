@@ -60,9 +60,11 @@ doc.write_file("output.cif")
 | `_entity_poly_seq` | Synced with `_entity` |
 | `_pdbx_entity_nonpoly` | Synced with `_entity` |
 | `_struct_asym` | Removes chains not present in edited structure |
-| `_struct_conn` | Removes connections involving removed atoms |
-| `_pdbx_poly_seq_scheme` | Synced with structure residues |
-| `_pdbx_nonpoly_scheme` | Synced with structure residues |
+| `_struct_conn` | Removes connections involving removed atoms/residues |
+| `_pdbx_struct_mod_residue` | Removes MODRES records for removed residues |
+| `_pdbx_poly_seq_scheme` | Synced with chain IDs |
+| `_pdbx_nonpoly_scheme` | Synced with chain IDs |
+| `_pdbx_branch_scheme` | Synced with chain IDs |
 
 ## Requirements
 
