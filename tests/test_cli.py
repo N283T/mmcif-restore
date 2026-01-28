@@ -83,12 +83,13 @@ class TestCli:
         assert output.exists()
 
         # Verify both categories restored
+        # 5i55.cif has 4 entities/chains, after removing water: 3 each
         doc = gemmi.cif.read(str(output))
         block = doc[0]
         entity_count = len(list(block.find("_entity.", ["id"])))
         asym_count = len(list(block.find("_struct_asym.", ["id"])))
-        assert entity_count == 2
-        assert asym_count == 2
+        assert entity_count == 3
+        assert asym_count == 3
 
     def test_error_no_categories(self, sample_cif_file: Path, tmp_path: Path) -> None:
         """Test error when no categories specified."""

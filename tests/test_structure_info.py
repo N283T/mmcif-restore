@@ -21,19 +21,21 @@ class TestStructureInfoFromStructure:
         """Test that entity IDs are extracted from structure."""
         info = StructureInfo.from_structure(sample_structure)
 
-        # Should have entities 1, 2, 3 (polymer, ligand, water)
+        # 5i55.cif has entities 1, 2, 3, 4 (polymer, 2x non-polymer, water)
         assert "1" in info.entity_ids
         assert "2" in info.entity_ids
         assert "3" in info.entity_ids
+        assert "4" in info.entity_ids
 
     def test_extracts_chain_ids(self, sample_structure: gemmi.Structure) -> None:
         """Test that chain IDs are extracted from structure."""
         info = StructureInfo.from_structure(sample_structure)
 
-        # Should have chains A, B, C
+        # 5i55.cif has chains A, B, C, D
         assert "A" in info.chain_ids
         assert "B" in info.chain_ids
         assert "C" in info.chain_ids
+        assert "D" in info.chain_ids
 
 
 class TestStructureInfoFromStructureWithReference:
@@ -54,10 +56,11 @@ class TestStructureInfoFromStructureWithReference:
             sample_cif_document[0],
         )
 
-        # Should have entities 1, 2 (not 3/water)
+        # 5i55.cif: after removing water, should have entities 1, 2, 3 (not 4/water)
         assert "1" in info.entity_ids
         assert "2" in info.entity_ids
-        assert "3" not in info.entity_ids
+        assert "3" in info.entity_ids
+        assert "4" not in info.entity_ids
 
     def test_extracts_chain_ids_without_water(
         self,
@@ -74,10 +77,11 @@ class TestStructureInfoFromStructureWithReference:
             sample_cif_document[0],
         )
 
-        # Should have chains A, B (not C/water)
+        # 5i55.cif: after removing water, should have chains A, B, C (not D/water)
         assert "A" in info.chain_ids
         assert "B" in info.chain_ids
-        assert "C" not in info.chain_ids
+        assert "C" in info.chain_ids
+        assert "D" not in info.chain_ids
 
     def test_handles_minimal_cif_without_entities(self, tmp_path: Path) -> None:
         """Test with a minimal CIF that has no entity info."""
