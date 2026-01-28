@@ -60,12 +60,14 @@ class TestRestoreCategories:
         )
 
         # Check _struct_asym was restored and synced (no water chain)
+        # 5i55.cif has chains A, B, C (non-water) and D (water)
         block = doc[0]
         chain_ids = [row[0] for row in block.find("_struct_asym.", ["id"])]
 
         assert "A" in chain_ids
         assert "B" in chain_ids
-        assert "C" not in chain_ids  # Water chain removed
+        assert "C" in chain_ids
+        assert "D" not in chain_ids  # Water chain removed
 
     def test_restores_multiple_categories(
         self, sample_cif_file: Path, tmp_path: Path
@@ -90,12 +92,13 @@ class TestRestoreCategories:
         )
 
         # Check both categories exist
+        # 5i55.cif: 4 entities -> 3 after removing water
         block = doc[0]
         entity_count = len(list(block.find("_entity.", ["id"])))
         asym_count = len(list(block.find("_struct_asym.", ["id"])))
 
-        assert entity_count == 2  # polymer and non-polymer (no water)
-        assert asym_count == 2  # A and B (no water chain C)
+        assert entity_count == 3  # 1 polymer + 2 non-polymer (no water)
+        assert asym_count == 3  # A, B, C (no water chain D)
 
     def test_normalizes_category_prefix(
         self, sample_cif_file: Path, tmp_path: Path
@@ -122,7 +125,7 @@ class TestRestoreCategories:
         # Should still work
         block = doc[0]
         entity_count = len(list(block.find("_entity.", ["id"])))
-        assert entity_count == 2
+        assert entity_count == 3  # 1 polymer + 2 non-polymer (no water)
 
 
 class TestRestoreErrorHandling:

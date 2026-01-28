@@ -15,10 +15,11 @@ class TestSyncSchemeCategories:
         """Test that _pdbx_nonpoly_scheme rows are removed for removed chains."""
         block = sample_cif_document[0]
 
-        # Keep only chains A and B (remove water chain C)
+        # 5i55.cif: chains A (polymer), B, C (non-polymer), D (water)
+        # Keep chains A, B, C (remove water chain D)
         info = StructureInfo(
-            entity_ids=frozenset(["1", "2"]),
-            chain_ids=frozenset(["A", "B"]),
+            entity_ids=frozenset(["1", "2", "3"]),
+            chain_ids=frozenset(["A", "B", "C"]),
         )
 
         sync_scheme_categories(block, info)
@@ -27,8 +28,9 @@ class TestSyncSchemeCategories:
         nonpoly_scheme = block.find("_pdbx_nonpoly_scheme.", ["asym_id", "mon_id"])
         asym_ids = [row[0] for row in nonpoly_scheme]
 
-        assert "C" not in asym_ids
+        assert "D" not in asym_ids  # water chain removed
         assert "B" in asym_ids  # non-polymer still present
+        assert "C" in asym_ids  # non-polymer still present
 
     def test_removes_multiple_scheme_rows(
         self, sample_cif_document: gemmi.cif.Document
@@ -59,10 +61,10 @@ class TestSyncSchemeCategories:
         # Get original count
         original_count = len(list(block.find("_pdbx_nonpoly_scheme.", ["asym_id"])))
 
-        # Keep all chains
+        # 5i55.cif has 4 chains
         info = StructureInfo(
-            entity_ids=frozenset(["1", "2", "3"]),
-            chain_ids=frozenset(["A", "B", "C"]),
+            entity_ids=frozenset(["1", "2", "3", "4"]),
+            chain_ids=frozenset(["A", "B", "C", "D"]),
         )
 
         sync_scheme_categories(block, info)

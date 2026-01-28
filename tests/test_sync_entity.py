@@ -15,10 +15,11 @@ class TestSyncEntityCategories:
         """Test that water entity is removed from _entity."""
         block = sample_cif_document[0]
 
-        # Keep only entities 1 and 2 (remove water entity 3)
+        # 5i55.cif: entities 1 (polymer), 2 (non-polymer), 3 (non-polymer), 4 (water)
+        # Keep entities 1, 2, 3 (remove water entity 4)
         info = StructureInfo(
-            entity_ids=frozenset(["1", "2"]),
-            chain_ids=frozenset(["A", "B"]),
+            entity_ids=frozenset(["1", "2", "3"]),
+            chain_ids=frozenset(["A", "B", "C"]),
         )
 
         sync_entity_categories(block, info)
@@ -27,29 +28,43 @@ class TestSyncEntityCategories:
         entity_table = block.find("_entity.", ["id", "type"])
         entity_ids = [row[0] for row in entity_table]
 
-        assert "3" not in entity_ids
+        assert "4" not in entity_ids  # water removed
         assert "1" in entity_ids  # polymer still present
         assert "2" in entity_ids  # non-polymer still present
+        assert "3" in entity_ids  # non-polymer still present
 
-    def test_removes_entity_poly_row(
-        self, sample_cif_document: gemmi.cif.Document
-    ) -> None:
+    def test_removes_entity_poly_row(self) -> None:
         """Test that entity_poly row is removed for removed polymer."""
-        block = sample_cif_document[0]
+        # Use synthetic CIF with _entity_poly in loop format
+        # (real files may use pair format for single-row categories)
+        cif_content = """\
+data_TEST
+#
+loop_
+_entity_poly.entity_id
+_entity_poly.type
+_entity_poly.pdbx_strand_id
+1 'polypeptide(L)' A
+2 'polypeptide(L)' B
+#
+"""
+        doc = gemmi.cif.read_string(cif_content)
+        block = doc[0]
 
-        # Keep only entities 2 and 3 (remove polymer entity 1)
+        # Keep only entity 2 (remove polymer entity 1)
         info = StructureInfo(
-            entity_ids=frozenset(["2", "3"]),
-            chain_ids=frozenset(["B", "C"]),
+            entity_ids=frozenset(["2"]),
+            chain_ids=frozenset(["B"]),
         )
 
         sync_entity_categories(block, info)
 
-        # Check _entity_poly table - should be empty after removing the only polymer
+        # Check _entity_poly table - entity 1 should be removed
         entity_poly = block.find("_entity_poly.", ["entity_id"])
         entity_ids = [row[0] for row in entity_poly]
 
         assert "1" not in entity_ids
+        assert "2" in entity_ids
 
     def test_no_changes_when_all_kept(
         self, sample_cif_document: gemmi.cif.Document
@@ -60,10 +75,10 @@ class TestSyncEntityCategories:
         # Get original counts
         original_entity_count = len(list(block.find("_entity.", ["id"])))
 
-        # Keep all entities
+        # 5i55.cif has 4 entities and 4 chains
         info = StructureInfo(
-            entity_ids=frozenset(["1", "2", "3"]),
-            chain_ids=frozenset(["A", "B", "C"]),
+            entity_ids=frozenset(["1", "2", "3", "4"]),
+            chain_ids=frozenset(["A", "B", "C", "D"]),
         )
 
         sync_entity_categories(block, info)
@@ -162,13 +177,13 @@ _entity_poly_seq.hetero
         assert new_count == original_count
         assert new_count == 3
 
-    def test_handles_missing_entity_poly_seq(
+    def test_handles_partial_entity_sync(
         self, sample_cif_document: gemmi.cif.Document
     ) -> None:
-        """Test that sync works when _entity_poly_seq doesn't exist."""
+        """Test that sync works with partial entity set."""
         block = sample_cif_document[0]
 
-        # sample_cif_document doesn't have _entity_poly_seq
+        # Keep only entity 1
         info = StructureInfo(
             entity_ids=frozenset(["1"]),
             chain_ids=frozenset(["A"]),
@@ -176,3 +191,7 @@ _entity_poly_seq.hetero
 
         # Should not raise
         sync_entity_categories(block, info)
+
+        # Verify only entity 1 remains
+        entity_ids = [row[0] for row in block.find("_entity.", ["id"])]
+        assert entity_ids == ["1"]
