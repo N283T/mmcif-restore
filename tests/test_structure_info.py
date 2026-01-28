@@ -16,6 +16,7 @@ class TestStructureInfoFromStructure:
         info = StructureInfo.from_structure(structure)
         assert info.entity_ids == frozenset()
         assert info.chain_ids == frozenset()
+        assert info.auth_chain_ids == frozenset()
 
     def test_extracts_entity_ids(self, sample_structure: gemmi.Structure) -> None:
         """Test that entity IDs are extracted from structure."""
@@ -36,6 +37,14 @@ class TestStructureInfoFromStructure:
         assert "B" in info.chain_ids
         assert "C" in info.chain_ids
         assert "D" in info.chain_ids
+
+    def test_extracts_auth_chain_ids(self, sample_structure: gemmi.Structure) -> None:
+        """Test that auth chain IDs (chain.name) are extracted from structure."""
+        info = StructureInfo.from_structure(sample_structure)
+
+        # 5i55.cif has a single auth chain A (all subchains share one PDB chain)
+        assert "A" in info.auth_chain_ids
+        assert info.auth_chain_ids == frozenset(["A"])
 
 
 class TestStructureInfoFromStructureWithReference:
@@ -82,6 +91,24 @@ class TestStructureInfoFromStructureWithReference:
         assert "B" in info.chain_ids
         assert "C" in info.chain_ids
         assert "D" not in info.chain_ids
+
+    def test_extracts_auth_chain_ids_without_water(
+        self,
+        sample_structure: gemmi.Structure,
+        sample_cif_document: gemmi.cif.Document,
+    ) -> None:
+        """Test auth chain ID extraction after water removal."""
+        sample_structure.remove_waters()
+
+        info = StructureInfo.from_structure_with_reference(
+            sample_structure,
+            sample_cif_document[0],
+        )
+
+        # 5i55.cif: single auth chain A (all subchains share one PDB chain)
+        # After removing water, chain A still has residues so it remains
+        assert "A" in info.auth_chain_ids
+        assert info.auth_chain_ids == frozenset(["A"])
 
     def test_handles_minimal_cif_without_entities(self, tmp_path: Path) -> None:
         """Test with a minimal CIF that has no entity info."""

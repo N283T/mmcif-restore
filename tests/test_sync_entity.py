@@ -20,6 +20,7 @@ class TestSyncEntityCategories:
         info = StructureInfo(
             entity_ids=frozenset(["1", "2", "3"]),
             chain_ids=frozenset(["A", "B", "C"]),
+            auth_chain_ids=frozenset(["A", "B", "C"]),
         )
 
         sync_entity_categories(block, info)
@@ -55,6 +56,7 @@ _entity_poly.pdbx_strand_id
         info = StructureInfo(
             entity_ids=frozenset(["2"]),
             chain_ids=frozenset(["B"]),
+            auth_chain_ids=frozenset(["B"]),
         )
 
         sync_entity_categories(block, info)
@@ -79,6 +81,7 @@ _entity_poly.pdbx_strand_id
         info = StructureInfo(
             entity_ids=frozenset(["1", "2", "3", "4"]),
             chain_ids=frozenset(["A", "B", "C", "D"]),
+            auth_chain_ids=frozenset(["A", "B", "C", "D"]),
         )
 
         sync_entity_categories(block, info)
@@ -97,6 +100,7 @@ _entity_poly.pdbx_strand_id
         info = StructureInfo(
             entity_ids=frozenset(["1"]),
             chain_ids=frozenset(["A"]),
+            auth_chain_ids=frozenset(["A"]),
         )
 
         sync_entity_categories(block, info)
@@ -135,6 +139,7 @@ _entity_poly_seq.hetero
         info = StructureInfo(
             entity_ids=frozenset(["1"]),
             chain_ids=frozenset(["A"]),
+            auth_chain_ids=frozenset(["A"]),
         )
 
         sync_entity_categories(block, info)
@@ -168,6 +173,7 @@ _entity_poly_seq.hetero
         info = StructureInfo(
             entity_ids=frozenset(["1", "2"]),
             chain_ids=frozenset(["A", "B"]),
+            auth_chain_ids=frozenset(["A", "B"]),
         )
 
         original_count = len(list(block.find("_entity_poly_seq.", ["entity_id"])))
@@ -187,6 +193,7 @@ _entity_poly_seq.hetero
         info = StructureInfo(
             entity_ids=frozenset(["1"]),
             chain_ids=frozenset(["A"]),
+            auth_chain_ids=frozenset(["A"]),
         )
 
         # Should not raise
@@ -218,6 +225,7 @@ _entity_poly.pdbx_strand_id       A
         info = StructureInfo(
             entity_ids=frozenset(["2"]),
             chain_ids=frozenset(["B"]),
+            auth_chain_ids=frozenset(["B"]),
         )
 
         sync_entity_categories(block, info)
@@ -245,6 +253,7 @@ _entity_poly.pdbx_strand_id       A
         info = StructureInfo(
             entity_ids=frozenset(["1"]),
             chain_ids=frozenset(["A"]),
+            auth_chain_ids=frozenset(["A"]),
         )
 
         sync_entity_categories(block, info)
@@ -272,6 +281,7 @@ _entity_poly.pdbx_strand_id       A
         info = StructureInfo(
             entity_ids=frozenset(["1"]),
             chain_ids=frozenset(["A"]),
+            auth_chain_ids=frozenset(["A"]),
         )
 
         sync_entity_categories(block, info)
@@ -295,6 +305,7 @@ _entity_poly.pdbx_strand_id       A
         info = StructureInfo(
             entity_ids=frozenset(["2", "3", "4"]),
             chain_ids=frozenset(["B", "C", "D"]),
+            auth_chain_ids=frozenset(["B", "C", "D"]),
         )
 
         sync_entity_categories(block, info)
@@ -303,3 +314,134 @@ _entity_poly.pdbx_strand_id       A
         entity_poly = block.find("_entity_poly.", ["entity_id"])
         entity_ids = [row[0] for row in entity_poly]
         assert entity_ids == []
+
+
+class TestSyncStrandIds:
+    """Tests for pdbx_strand_id synchronization in _entity_poly."""
+
+    def test_filters_strand_ids_for_removed_chains(self) -> None:
+        """Test that pdbx_strand_id removes chains no longer in structure."""
+        cif_content = """\
+data_TEST
+#
+loop_
+_entity_poly.entity_id
+_entity_poly.type
+_entity_poly.pdbx_strand_id
+1 'polypeptide(L)' A,B,C
+#
+"""
+        doc = gemmi.cif.read_string(cif_content)
+        block = doc[0]
+
+        # Structure only has chains A and B (C removed)
+        info = StructureInfo(
+            entity_ids=frozenset(["1"]),
+            chain_ids=frozenset(["A", "B"]),
+            auth_chain_ids=frozenset(["A", "B"]),
+        )
+
+        sync_entity_categories(block, info)
+
+        data = block.get_mmcif_category("_entity_poly.", raw=True)
+        assert data["pdbx_strand_id"] == ["A,B"]
+
+    def test_strand_id_unchanged_when_all_chains_kept(self) -> None:
+        """Test that pdbx_strand_id is unchanged when all chains are present."""
+        cif_content = """\
+data_TEST
+#
+_entity_poly.entity_id            1
+_entity_poly.type                 'polypeptide(L)'
+_entity_poly.pdbx_strand_id       A
+#
+"""
+        doc = gemmi.cif.read_string(cif_content)
+        block = doc[0]
+
+        info = StructureInfo(
+            entity_ids=frozenset(["1"]),
+            chain_ids=frozenset(["A"]),
+            auth_chain_ids=frozenset(["A"]),
+        )
+
+        sync_entity_categories(block, info)
+
+        data = block.get_mmcif_category("_entity_poly.", raw=True)
+        assert data["pdbx_strand_id"] == ["A"]
+
+    def test_strand_id_cleared_when_chain_removed(self) -> None:
+        """Test that pdbx_strand_id becomes empty when its chain is removed."""
+        cif_content = """\
+data_TEST
+#
+loop_
+_entity_poly.entity_id
+_entity_poly.type
+_entity_poly.pdbx_strand_id
+1 'polypeptide(L)' A
+2 'polypeptide(L)' B
+#
+"""
+        doc = gemmi.cif.read_string(cif_content)
+        block = doc[0]
+
+        # Keep both entities but only auth chain A present
+        info = StructureInfo(
+            entity_ids=frozenset(["1", "2"]),
+            chain_ids=frozenset(["A", "B"]),
+            auth_chain_ids=frozenset(["A"]),
+        )
+
+        sync_entity_categories(block, info)
+
+        data = block.get_mmcif_category("_entity_poly.", raw=True)
+        assert data["pdbx_strand_id"] == ["A", "?"]
+
+    def test_multi_entity_strand_id_filtering(self) -> None:
+        """Test strand_id filtering with multiple polymer entities."""
+        cif_content = """\
+data_TEST
+#
+loop_
+_entity_poly.entity_id
+_entity_poly.type
+_entity_poly.pdbx_strand_id
+1 'polypeptide(L)' A,B
+2 'polynucleotide' C,D,E
+#
+"""
+        doc = gemmi.cif.read_string(cif_content)
+        block = doc[0]
+
+        # Structure has chains A, C, D (B and E removed)
+        info = StructureInfo(
+            entity_ids=frozenset(["1", "2"]),
+            chain_ids=frozenset(["A", "B", "C", "D", "E"]),
+            auth_chain_ids=frozenset(["A", "C", "D"]),
+        )
+
+        sync_entity_categories(block, info)
+
+        data = block.get_mmcif_category("_entity_poly.", raw=True)
+        assert data["pdbx_strand_id"] == ["A", "C,D"]
+
+    def test_missing_entity_poly_category(self) -> None:
+        """Test that missing _entity_poly category is handled gracefully."""
+        cif_content = """\
+data_TEST
+#
+_entity.id 1
+#
+"""
+        doc = gemmi.cif.read_string(cif_content)
+        block = doc[0]
+
+        info = StructureInfo(
+            entity_ids=frozenset(["1"]),
+            chain_ids=frozenset(["A"]),
+            auth_chain_ids=frozenset(["A"]),
+        )
+
+        # Should not raise
+        sync_entity_categories(block, info)
