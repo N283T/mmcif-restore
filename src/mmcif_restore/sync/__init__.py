@@ -3,6 +3,7 @@
 from mmcif_restore.sync.chain import sync_chain_categories
 from mmcif_restore.sync.conn import sync_conn_categories
 from mmcif_restore.sync.entity import sync_entity_categories
+from mmcif_restore.sync.modres import sync_modres_categories
 from mmcif_restore.sync.scheme import sync_scheme_categories
 
 __all__ = [
@@ -10,4 +11,5 @@ __all__ = [
     "sync_chain_categories",
     "sync_scheme_categories",
     "sync_conn_categories",
+    "sync_modres_categories",
 ]
