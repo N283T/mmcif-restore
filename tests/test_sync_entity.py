@@ -91,3 +91,88 @@ class TestSyncEntityCategories:
         entity_ids = [row[0] for row in entity_table]
 
         assert entity_ids == ["1"]
+
+
+class TestSyncEntityPolySeq:
+    """Tests for _entity_poly_seq synchronization."""
+
+    def test_removes_entity_poly_seq_rows(self) -> None:
+        """Test that _entity_poly_seq rows are removed for removed entities."""
+        cif_content = """\
+data_TEST
+#
+loop_
+_entity_poly_seq.entity_id
+_entity_poly_seq.num
+_entity_poly_seq.mon_id
+_entity_poly_seq.hetero
+1 1 ALA n
+1 2 GLY n
+1 3 SER n
+2 1 VAL n
+2 2 LEU n
+#
+"""
+        doc = gemmi.cif.read_string(cif_content)
+        block = doc[0]
+
+        # Keep only entity 1
+        info = StructureInfo(
+            entity_ids=frozenset(["1"]),
+            chain_ids=frozenset(["A"]),
+        )
+
+        sync_entity_categories(block, info)
+
+        # Check _entity_poly_seq - entity 2 rows should be removed
+        seq_table = block.find("_entity_poly_seq.", ["entity_id", "num"])
+        entity_ids = [row[0] for row in seq_table]
+
+        assert "2" not in entity_ids
+        assert entity_ids.count("1") == 3
+
+    def test_keeps_all_entity_poly_seq_when_all_kept(self) -> None:
+        """Test that all _entity_poly_seq rows remain when all entities kept."""
+        cif_content = """\
+data_TEST
+#
+loop_
+_entity_poly_seq.entity_id
+_entity_poly_seq.num
+_entity_poly_seq.mon_id
+_entity_poly_seq.hetero
+1 1 ALA n
+1 2 GLY n
+2 1 VAL n
+#
+"""
+        doc = gemmi.cif.read_string(cif_content)
+        block = doc[0]
+
+        # Keep both entities
+        info = StructureInfo(
+            entity_ids=frozenset(["1", "2"]),
+            chain_ids=frozenset(["A", "B"]),
+        )
+
+        original_count = len(list(block.find("_entity_poly_seq.", ["entity_id"])))
+        sync_entity_categories(block, info)
+        new_count = len(list(block.find("_entity_poly_seq.", ["entity_id"])))
+
+        assert new_count == original_count
+        assert new_count == 3
+
+    def test_handles_missing_entity_poly_seq(
+        self, sample_cif_document: gemmi.cif.Document
+    ) -> None:
+        """Test that sync works when _entity_poly_seq doesn't exist."""
+        block = sample_cif_document[0]
+
+        # sample_cif_document doesn't have _entity_poly_seq
+        info = StructureInfo(
+            entity_ids=frozenset(["1"]),
+            chain_ids=frozenset(["A"]),
+        )
+
+        # Should not raise
+        sync_entity_categories(block, info)
