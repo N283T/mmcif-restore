@@ -195,3 +195,111 @@ _entity_poly_seq.hetero
         # Verify only entity 1 remains
         entity_ids = [row[0] for row in block.find("_entity.", ["id"])]
         assert entity_ids == ["1"]
+
+
+class TestSyncEntityPolyPairFormat:
+    """Tests for _entity_poly sync with pair format (single-row categories)."""
+
+    def test_removes_entity_poly_pair_format(self) -> None:
+        """Test that _entity_poly in pair format is removed when entity removed."""
+        # Pair format: single polymer stored as key-value pairs (not loop)
+        cif_content = """\
+data_TEST
+#
+_entity_poly.entity_id            1
+_entity_poly.type                 'polypeptide(L)'
+_entity_poly.pdbx_strand_id       A
+#
+"""
+        doc = gemmi.cif.read_string(cif_content)
+        block = doc[0]
+
+        # Remove entity 1 (keep only entity 2 which doesn't exist)
+        info = StructureInfo(
+            entity_ids=frozenset(["2"]),
+            chain_ids=frozenset(["B"]),
+        )
+
+        sync_entity_categories(block, info)
+
+        # _entity_poly should be empty (entity 1 removed)
+        entity_poly = block.find("_entity_poly.", ["entity_id"])
+        entity_ids = [row[0] for row in entity_poly]
+        assert entity_ids == []
+
+    def test_keeps_entity_poly_pair_format(self) -> None:
+        """Test that _entity_poly in pair format is kept when entity kept."""
+        # Pair format: single polymer stored as key-value pairs
+        cif_content = """\
+data_TEST
+#
+_entity_poly.entity_id            1
+_entity_poly.type                 'polypeptide(L)'
+_entity_poly.pdbx_strand_id       A
+#
+"""
+        doc = gemmi.cif.read_string(cif_content)
+        block = doc[0]
+
+        # Keep entity 1
+        info = StructureInfo(
+            entity_ids=frozenset(["1"]),
+            chain_ids=frozenset(["A"]),
+        )
+
+        sync_entity_categories(block, info)
+
+        # _entity_poly should still have entity 1
+        entity_poly = block.find("_entity_poly.", ["entity_id"])
+        entity_ids = [row[0] for row in entity_poly]
+        assert entity_ids == ["1"]
+
+    def test_syncs_entity_poly_from_real_cif_pair_format(
+        self, sample_cif_document: gemmi.cif.Document
+    ) -> None:
+        """Test sync with real CIF that uses pair format for _entity_poly.
+
+        5i55.cif has _entity_poly in pair format (single polymer entity).
+        """
+        block = sample_cif_document[0]
+
+        # Verify the original has entity_poly with entity 1
+        original_poly = block.get_mmcif_category("_entity_poly.", raw=True)
+        assert "entity_id" in original_poly
+        assert original_poly["entity_id"] == ["1"]
+
+        # Keep only entity 1 (the polymer)
+        info = StructureInfo(
+            entity_ids=frozenset(["1"]),
+            chain_ids=frozenset(["A"]),
+        )
+
+        sync_entity_categories(block, info)
+
+        # _entity_poly should still have entity 1
+        entity_poly = block.find("_entity_poly.", ["entity_id"])
+        entity_ids = [row[0] for row in entity_poly]
+        assert entity_ids == ["1"]
+
+    def test_removes_entity_poly_from_real_cif_pair_format(
+        self, sample_cif_document: gemmi.cif.Document
+    ) -> None:
+        """Test removing polymer entity from real CIF with pair format _entity_poly.
+
+        5i55.cif has _entity_poly in pair format (single polymer entity).
+        When we remove the polymer entity, _entity_poly should become empty.
+        """
+        block = sample_cif_document[0]
+
+        # Keep only non-polymer entities (2, 3, 4) - remove polymer entity 1
+        info = StructureInfo(
+            entity_ids=frozenset(["2", "3", "4"]),
+            chain_ids=frozenset(["B", "C", "D"]),
+        )
+
+        sync_entity_categories(block, info)
+
+        # _entity_poly should be empty (polymer entity 1 removed)
+        entity_poly = block.find("_entity_poly.", ["entity_id"])
+        entity_ids = [row[0] for row in entity_poly]
+        assert entity_ids == []

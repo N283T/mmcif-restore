@@ -1,6 +1,7 @@
 """Shared utility functions for sync modules."""
 
 import logging
+from typing import Any
 
 import gemmi
 
@@ -15,6 +16,8 @@ def keep_rows_by_column(
 ) -> None:
     """Keep only rows where the filter column value is in keep_values.
 
+    Uses get_mmcif_category/set_mmcif_category to handle both loop and pair formats.
+
     Args:
         block: CIF block to modify
         category_prefix: Category prefix (e.g., "_entity.")
@@ -24,42 +27,38 @@ def keep_rows_by_column(
     if not keep_values:
         return
 
-    # Find the loop object containing this category
-    target_loop = None
-    for item in block:
-        if item.loop is not None:
-            tags = item.loop.tags
-            if tags and tags[0].startswith(category_prefix):
-                target_loop = item.loop
-                break
-
-    if target_loop is None:
-        logger.debug("No loop found for category %s", category_prefix)
+    # Get category data as dictionary (works for both loop and pair formats)
+    try:
+        data: dict[str, list[Any]] = block.get_mmcif_category(category_prefix, raw=True)
+    except RuntimeError:
+        logger.debug("Category %s not found", category_prefix)
         return
 
-    # Get column index for filter
-    filter_col_tag = f"{category_prefix}{filter_column}"
-    try:
-        filter_col_idx = list(target_loop.tags).index(filter_col_tag)
-    except ValueError:
+    if not data:
+        logger.debug("No data found for category %s", category_prefix)
+        return
+
+    # Check if filter column exists
+    if filter_column not in data:
         logger.debug(
             "Column %s not found in category %s", filter_column, category_prefix
         )
         return
 
-    # Get all current values
-    all_values = list(target_loop.values)
-    width = target_loop.width()
-    num_rows = target_loop.length()
+    filter_values = data[filter_column]
+    num_rows = len(filter_values)
 
-    # Build new columns keeping only rows with valid values
-    new_columns: list[list[str]] = [[] for _ in range(width)]
-    for row_idx in range(num_rows):
-        row_start = row_idx * width
-        row_value = all_values[row_start + filter_col_idx]
-        if row_value in keep_values:
-            for col_idx in range(width):
-                new_columns[col_idx].append(all_values[row_start + col_idx])
+    # Find row indices to keep
+    keep_indices = [i for i, val in enumerate(filter_values) if val in keep_values]
 
-    # Replace loop values
-    target_loop.set_all_values(new_columns)
+    # If all rows are kept, no changes needed
+    if len(keep_indices) == num_rows:
+        return
+
+    # Build filtered data
+    filtered_data: dict[str, list[Any]] = {}
+    for col_name, col_values in data.items():
+        filtered_data[col_name] = [col_values[i] for i in keep_indices]
+
+    # Write back filtered data (handles both loop and pair formats)
+    block.set_mmcif_category(category_prefix, filtered_data, raw=True)
