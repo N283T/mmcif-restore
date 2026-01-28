@@ -14,6 +14,7 @@ def sync_entity_categories(block: gemmi.cif.Block, info: StructureInfo) -> None:
     Categories synced:
     - _entity
     - _entity_poly
+    - _entity_poly_seq
     - _pdbx_entity_nonpoly
 
     Args:
@@ -25,6 +26,9 @@ def sync_entity_categories(block: gemmi.cif.Block, info: StructureInfo) -> None:
 
     # Sync _entity_poly (entity_id column)
     keep_rows_by_column(block, "_entity_poly.", "entity_id", info.entity_ids)
+
+    # Sync _entity_poly_seq (entity_id column)
+    keep_rows_by_column(block, "_entity_poly_seq.", "entity_id", info.entity_ids)
 
     # Sync _pdbx_entity_nonpoly (entity_id column)
     keep_rows_by_column(block, "_pdbx_entity_nonpoly.", "entity_id", info.entity_ids)

@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 CATEGORY_SYNC_HANDLERS: dict[str, Callable[[gemmi.cif.Block, StructureInfo], None]] = {
     "_entity.": sync_entity_categories,
     "_entity_poly.": sync_entity_categories,
+    "_entity_poly_seq.": sync_entity_categories,
     "_pdbx_entity_nonpoly.": sync_entity_categories,
     "_struct_asym.": sync_chain_categories,
     "_pdbx_nonpoly_scheme.": sync_scheme_categories,
