@@ -185,3 +185,21 @@ class TestRestoreErrorHandling:
                 sample_cif_file,
                 categories=["_entity."],
             )
+
+    def test_raises_error_for_structure_with_no_atoms(
+        self, sample_cif_file: Path, tmp_path: Path
+    ) -> None:
+        """Test error when edited CIF has structure but no atoms."""
+        # Create a CIF with header but no atom_site
+        no_atoms_cif = tmp_path / "no_atoms.cif"
+        no_atoms_cif.write_text("""\
+data_TEST
+_entry.id TEST
+""")
+
+        with pytest.raises(RestoreError, match="contains no atoms"):
+            restore_categories(
+                no_atoms_cif,
+                sample_cif_file,
+                categories=["_entity."],
+            )

@@ -10,6 +10,7 @@ from mmcif_restore.structure_info import StructureInfo
 from mmcif_restore.sync.chain import sync_chain_categories
 from mmcif_restore.sync.conn import sync_conn_categories
 from mmcif_restore.sync.entity import sync_entity_categories
+from mmcif_restore.sync.modres import sync_modres_categories
 from mmcif_restore.sync.scheme import sync_scheme_categories
 
 logger = logging.getLogger(__name__)
@@ -25,8 +26,13 @@ CATEGORY_SYNC_HANDLERS: dict[str, Callable[[gemmi.cif.Block, StructureInfo], Non
     "_pdbx_branch_scheme.": sync_scheme_categories,
 }
 
-# Categories that need structure instead of info (atom-level sync)
-STRUCTURE_SYNC_CATEGORIES: set[str] = {"_struct_conn."}
+# Categories that need structure instead of info (residue/atom-level sync)
+STRUCTURE_SYNC_HANDLERS: dict[
+    str, Callable[[gemmi.cif.Block, gemmi.Structure], None]
+] = {
+    "_struct_conn.": sync_conn_categories,
+    "_pdbx_struct_mod_residue.": sync_modres_categories,
+}
 
 
 class RestoreError(Exception):
@@ -86,6 +92,10 @@ def restore_categories(
         structure = gemmi.read_structure(str(edited_path))
     except Exception as e:
         raise RestoreError(f"Failed to read edited CIF '{edited_path}': {e}") from e
+
+    # Validate structure is not empty
+    if len(structure) == 0 or all(len(model) == 0 for model in structure):
+        raise RestoreError(f"Edited CIF '{edited_path}' contains no atoms")
 
     info = StructureInfo.from_structure_with_reference(structure, ref_block)
 
@@ -154,9 +164,10 @@ def _restore_and_sync_category(
     new_loop.set_all_values(columns)
 
     # Apply sync based on category type
-    if category_prefix in STRUCTURE_SYNC_CATEGORIES:
-        # Atom-level sync (needs structure)
-        sync_conn_categories(target_block, structure)
+    if category_prefix in STRUCTURE_SYNC_HANDLERS:
+        # Residue/atom-level sync (needs structure)
+        handler = STRUCTURE_SYNC_HANDLERS[category_prefix]
+        handler(target_block, structure)
     else:
         # Chain/entity-level sync (uses info)
         handler = CATEGORY_SYNC_HANDLERS.get(category_prefix)
