@@ -18,6 +18,7 @@ class TestSyncChainCategories:
         info = StructureInfo(
             entity_ids=frozenset(["1", "2", "3"]),
             chain_ids=frozenset(["A", "B", "C"]),
+            auth_chain_ids=frozenset(["A", "B", "C"]),
         )
 
         sync_chain_categories(block, info)
@@ -41,6 +42,7 @@ class TestSyncChainCategories:
         info = StructureInfo(
             entity_ids=frozenset(["1"]),
             chain_ids=frozenset(["A"]),
+            auth_chain_ids=frozenset(["A"]),
         )
 
         sync_chain_categories(block, info)
@@ -64,6 +66,7 @@ class TestSyncChainCategories:
         info = StructureInfo(
             entity_ids=frozenset(["1", "2", "3", "4"]),
             chain_ids=frozenset(["A", "B", "C", "D"]),
+            auth_chain_ids=frozenset(["A", "B", "C", "D"]),
         )
 
         sync_chain_categories(block, info)

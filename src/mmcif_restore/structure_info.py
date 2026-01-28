@@ -12,10 +12,12 @@ class StructureInfo:
     Attributes:
         entity_ids: Set of entity IDs currently in the structure
         chain_ids: Set of chain IDs (label_asym_id/subchain) currently in the structure
+        auth_chain_ids: Set of auth chain IDs (auth_asym_id/PDB chain name)
     """
 
     entity_ids: frozenset[str]
     chain_ids: frozenset[str]
+    auth_chain_ids: frozenset[str]
 
     @classmethod
     def from_structure(cls, structure: gemmi.Structure) -> "StructureInfo":
@@ -29,6 +31,7 @@ class StructureInfo:
         """
         entity_ids: set[str] = set()
         chain_ids: set[str] = set()
+        auth_chain_ids: set[str] = set()
 
         # Build subchain to entity mapping from structure.entities
         subchain_to_entity: dict[str, str] = {}
@@ -38,17 +41,21 @@ class StructureInfo:
 
         for model in structure:
             for chain in model:
+                has_residues = False
                 for residue in chain:
                     if residue.subchain:
                         chain_ids.add(residue.subchain)
-                        # Find entity for this subchain
                         entity_id = subchain_to_entity.get(residue.subchain)
                         if entity_id:
                             entity_ids.add(entity_id)
+                        has_residues = True
+                if has_residues:
+                    auth_chain_ids.add(chain.name)
 
         return cls(
             entity_ids=frozenset(entity_ids),
             chain_ids=frozenset(chain_ids),
+            auth_chain_ids=frozenset(auth_chain_ids),
         )
 
     @classmethod
@@ -71,13 +78,18 @@ class StructureInfo:
             StructureInfo with current entity/chain IDs
         """
         chain_ids: set[str] = set()
+        auth_chain_ids: set[str] = set()
 
         # Get chain IDs from structure's actual residues
         for model in structure:
             for chain in model:
+                has_residues = False
                 for residue in chain:
                     if residue.subchain:
                         chain_ids.add(residue.subchain)
+                        has_residues = True
+                if has_residues:
+                    auth_chain_ids.add(chain.name)
 
         # Get entity mapping from reference _struct_asym
         chain_to_entity: dict[str, str] = {}
@@ -95,4 +107,5 @@ class StructureInfo:
         return cls(
             entity_ids=frozenset(entity_ids),
             chain_ids=frozenset(chain_ids),
+            auth_chain_ids=frozenset(auth_chain_ids),
         )

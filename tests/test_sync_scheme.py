@@ -20,6 +20,7 @@ class TestSyncSchemeCategories:
         info = StructureInfo(
             entity_ids=frozenset(["1", "2", "3"]),
             chain_ids=frozenset(["A", "B", "C"]),
+            auth_chain_ids=frozenset(["A", "B", "C"]),
         )
 
         sync_scheme_categories(block, info)
@@ -42,6 +43,7 @@ class TestSyncSchemeCategories:
         info = StructureInfo(
             entity_ids=frozenset(["1"]),
             chain_ids=frozenset(["A"]),
+            auth_chain_ids=frozenset(["A"]),
         )
 
         sync_scheme_categories(block, info)
@@ -65,6 +67,7 @@ class TestSyncSchemeCategories:
         info = StructureInfo(
             entity_ids=frozenset(["1", "2", "3", "4"]),
             chain_ids=frozenset(["A", "B", "C", "D"]),
+            auth_chain_ids=frozenset(["A", "B", "C", "D"]),
         )
 
         sync_scheme_categories(block, info)
@@ -106,6 +109,7 @@ B 2 1 VAL 1 1 VAL VAL B . n
         info = StructureInfo(
             entity_ids=frozenset(["1"]),
             chain_ids=frozenset(["A"]),
+            auth_chain_ids=frozenset(["A"]),
         )
 
         sync_scheme_categories(block, info)
@@ -138,6 +142,7 @@ B 2 1 VAL
         info = StructureInfo(
             entity_ids=frozenset(["1", "2"]),
             chain_ids=frozenset(["A", "B"]),
+            auth_chain_ids=frozenset(["A", "B"]),
         )
 
         original_count = len(list(block.find("_pdbx_poly_seq_scheme.", ["asym_id"])))
@@ -155,6 +160,7 @@ B 2 1 VAL
         info = StructureInfo(
             entity_ids=frozenset(["1"]),
             chain_ids=frozenset(["A"]),
+            auth_chain_ids=frozenset(["A"]),
         )
 
         # Should not raise
@@ -192,6 +198,7 @@ D 4 1 MAN D 1 D 1 MAN n
         info = StructureInfo(
             entity_ids=frozenset(["3"]),
             chain_ids=frozenset(["C"]),
+            auth_chain_ids=frozenset(["C"]),
         )
 
         sync_scheme_categories(block, info)
@@ -224,6 +231,7 @@ D 4 1 MAN
         info = StructureInfo(
             entity_ids=frozenset(["3", "4"]),
             chain_ids=frozenset(["C", "D"]),
+            auth_chain_ids=frozenset(["C", "D"]),
         )
 
         original_count = len(list(block.find("_pdbx_branch_scheme.", ["asym_id"])))
@@ -241,6 +249,7 @@ D 4 1 MAN
         info = StructureInfo(
             entity_ids=frozenset(["1"]),
             chain_ids=frozenset(["A"]),
+            auth_chain_ids=frozenset(["A"]),
         )
 
         # Should not raise
